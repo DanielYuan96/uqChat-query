@@ -9,6 +9,8 @@ public class GroupChatPageQueryParam {
 
     private Integer pageSize;
 
+    private Long userId;
+
     private String courseCode;
 
     private Integer categoryId;

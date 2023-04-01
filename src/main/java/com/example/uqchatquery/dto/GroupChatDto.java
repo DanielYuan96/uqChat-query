@@ -26,5 +26,7 @@ public class GroupChatDto {
 
     private Integer notification;
 
+    private Boolean isEnrolled;
+
 
 }

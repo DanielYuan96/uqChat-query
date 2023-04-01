@@ -54,6 +54,17 @@ public class GroupChatServiceImpl extends ServiceImpl<GroupChatMapper, GroupChat
                         Integer.parseInt(map.get("nums").toString()));
             }
         }
+
+        //查询当前用户已经选过的课程
+        relationQueryWrapper.clear();
+        relationQueryWrapper.eq("user_id", queryParam.getUserId());
+        List<GroupRelation> list = groupRelationService.list(relationQueryWrapper);
+        //如果当前用户选过课 即改列表不为空
+        Set<Integer> enrolledCourses = new HashSet<>();
+        if (!CollectionUtils.isEmpty(list)) {
+            enrolledCourses = list.stream().map(GroupRelation::getGroupChatId).collect(Collectors.toSet());
+        }
+
         ArrayList<GroupChatDto> result = new ArrayList<>(records.size());
         for (GroupChat record : records) {
             GroupChatDto groupChatDto = new GroupChatDto();
@@ -64,6 +75,8 @@ public class GroupChatServiceImpl extends ServiceImpl<GroupChatMapper, GroupChat
             groupChatDto.setGroupAvatar(record.getAvatar());
             groupChatDto.setCategory(record.getGroupCategoryId());
             groupChatDto.setMembersNum(membersNumMap.get(record.getId()));
+            Boolean isEnrolled = enrolledCourses.contains(groupChatDto.getGroupId());
+            groupChatDto.setIsEnrolled(isEnrolled);
             result.add(groupChatDto);
         }
         return result;
