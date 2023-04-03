@@ -13,4 +13,7 @@ public class GroupRelation {
 
     @TableField(value = "user_id")
     private Long userId;
+
+    @TableField(value = "user_lastack_msg_time")
+    private Long userLastAckMsgTime;
 }

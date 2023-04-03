@@ -7,25 +7,35 @@ import com.baomidou.mybatisplus.core.toolkit.Assert;
 import com.baomidou.mybatisplus.core.toolkit.Constants;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.example.uqchatquery.dao.mapper.MsgRelationMapper;
+import com.example.uqchatquery.dao.model.GroupRelation;
 import com.example.uqchatquery.dao.model.MsgHistory;
 import com.example.uqchatquery.dao.model.MsgRelation;
 import com.example.uqchatquery.dto.MessageBody;
+import com.example.uqchatquery.dto.QueryGroupHistoryMsgParam;
 import com.example.uqchatquery.dto.QueryHistoryMsgParam;
 import com.example.uqchatquery.dto.QueryUnReadMsgParam;
 import com.example.uqchatquery.enums.MsgReadedEnum;
+import com.example.uqchatquery.service.MsgHistoryService;
 import com.example.uqchatquery.service.MsgRelationService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.ibatis.binding.MapperMethod;
 import org.apache.ibatis.session.SqlSession;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
 
 import java.sql.Timestamp;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 public class MsgRelationServiceImpl extends ServiceImpl<MsgRelationMapper, MsgRelation> implements MsgRelationService {
+
+    @Autowired
+    MsgHistoryService msgHistoryService;
+
     @Override
     public Long saveMsgRelation(MessageBody messageBody, MsgHistory msgHistory) {
         MsgRelation msgRelation = new MsgRelation();
@@ -60,6 +70,44 @@ public class MsgRelationServiceImpl extends ServiceImpl<MsgRelationMapper, MsgRe
     }
 
     @Override
+    public List<MessageBody> queryGroupHistoryMsg(QueryGroupHistoryMsgParam queryParam) {
+        QueryWrapper<MsgRelation> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("group_chat_id", queryParam.getGroupId());
+        queryWrapper.orderByDesc("group_chat_id");
+        queryWrapper.last("LIMIT 20");
+        List<MsgRelation> msgRelationList = this.list(queryWrapper);
+        //生成map key为msgId value为msgRelation
+        HashMap<Long, MsgRelation> msgRelationMap = new HashMap<>();
+        if (!CollectionUtils.isEmpty(msgRelationList)) {
+            for (MsgRelation msgRelation : msgRelationList) {
+                msgRelationMap.put(msgRelation.getMsgId(), msgRelation);
+            }
+        }
+        //创建结果集
+        ArrayList<MessageBody> result = new ArrayList<>(msgRelationList.size());
+
+        List<Long> msgIds = msgRelationList.stream().map(MsgRelation::getMsgId).collect(Collectors.toList());
+        QueryWrapper<MsgHistory> historyQueryWrapper = new QueryWrapper<>();
+        historyQueryWrapper.in("id", msgIds);
+        List<MsgHistory> msgHistoryList = msgHistoryService.list(historyQueryWrapper);
+        if (!CollectionUtils.isEmpty(msgHistoryList)) {
+            for (MsgHistory msgHistory : msgHistoryList) {
+                MessageBody messageBody = new MessageBody();
+                messageBody.setMessageId(msgHistory.getMessageId());
+                messageBody.setMessage(msgHistory.getMessage());
+                messageBody.setSendTime(msgHistory.getSendTime().getTime());
+                //从之前的map中获取消息关系数据
+                MsgRelation msgRelation = msgRelationMap.get(msgHistory.getId());
+                messageBody.setIsGroupMsg(msgRelation.getIsGroupMsg());
+                messageBody.setSendId(msgRelation.getSendId());
+                messageBody.setGroupChatId(msgRelation.getGroupChatId());
+                result.add(messageBody);
+            }
+        }
+        return result;
+    }
+
+    @Override
     public Map<Long, Integer> queryUnreadMsg(QueryUnReadMsgParam queryParam) {
         QueryWrapper<MsgRelation> queryWrapper = new QueryWrapper<>();
         queryWrapper.select("send_id", "receiver_id", "COUNT(*) AS nums");
@@ -83,11 +131,12 @@ public class MsgRelationServiceImpl extends ServiceImpl<MsgRelationMapper, MsgRe
     }
 
     @Override
-    public Integer queryGroupUnreadMsg(Integer groupId, Long id) {
+    public Integer queryGroupUnreadMsg(GroupRelation groupRelation) {
         QueryWrapper<MsgRelation> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("group_chat_id", groupId);
-        queryWrapper.eq("receiver_id", id);
-        queryWrapper.eq("readed", MsgReadedEnum.UN_READED.getCode());
+        queryWrapper.eq("group_chat_id", groupRelation.getGroupChatId());
+//        queryWrapper.eq("receiver_id", id);
+        queryWrapper.ge("send_time", groupRelation.getUserLastAckMsgTime());
+//        queryWrapper.eq("readed", MsgReadedEnum.UN_READED.getCode());
         List<MsgRelation> list = this.list(queryWrapper);
         return list.size();
     }

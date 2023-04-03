@@ -5,9 +5,9 @@ import lombok.Data;
 @Data
 public class GroupChatPageQueryParam {
 
-    private Integer pageNum;
+    private Integer pageNum = 1;
 
-    private Integer pageSize;
+    private Integer pageSize = 10;
 
     private Long userId;
 
