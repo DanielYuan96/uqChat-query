@@ -11,6 +11,7 @@ import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 public class UqChatQueryApplication {
 
     public static void main(String[] args) {
+        System.out.println("doing test");
         SpringApplication.run(UqChatQueryApplication.class, args);
     }
 
